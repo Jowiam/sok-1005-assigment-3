@@ -1,0 +1,73 @@
+---
+format: html
+echo: FALSE
+---
+
+```{r}
+library(tidyverse)
+library(jsonlite)
+library(ggrepel)
+library(scales)
+```
+
+```{r}
+# URL-en for JSON-API-et
+url <- "https://static01.nyt.com/newsgraphics/2021/12/20/us-coronavirus-deaths-2021/ff0adde21623e111d8ce103fedecf7ffc7906264/scatter.json"
+
+# Henter dataene som JSON
+data <- fromJSON(url)
+```
+
+```{r}
+
+df <- data %>% 
+  mutate(state_name = state.abb[match(name, state.name)])
+df[9, 7] = "D.C"
+```
+
+```{r,fig.width=5, fig.height=4}
+part_1 <- df %>%
+  
+ggplot(aes(x=fully_vaccinated_pct_of_pop*100, y=deaths_per_100k, label=state_name))+
+  theme_bw()+
+  geom_point(color="aquamarine", size=1.5)+
+  geom_text_repel(size=2)+
+  
+  # Changing and removing titles
+  labs(x="Share of total population fully vaccinated", 
+       y="",
+       subtitle="Avg. monthly deaths per 100,000", 
+       title = "Covid-19 deaths since universal adult vaccine eligibility compared with vaccination rates",
+       caption = "[New York Times](https://www.nytimes.com/interactive/2021/us/covid-cases.html) Dec. 20, 2021.")+
+  
+  #setting y scale
+  scale_y_continuous(breaks = seq(from = 0, to = 20, by = 5),
+                     limits = c(0,20),
+                     expand = c(0, 0))+
+  
+  #setting x scale
+  scale_x_continuous(labels = percent_format(scale = 1),
+                     breaks = seq(45,80,5),
+                     limits = c(45,80),
+                     expand = c(0, 0))+
+  
+  # Setting theme, and fixing it dotted
+  theme(panel.border=element_rect(linetype=3,fill=NA),
+        panel.grid=element_line(linetype ="dotted"))+
+  # text
+  # arrow 
+  annotate("text",x=60, y=17, label= "Lower vaccination rate, higher death rate")+
+  annotate("text", x=70, y=11, label= "Higher vaccination rate, lower death rate")+
+  geom_segment(aes(x=56, y=17.5, xend=54, yend=18.5), arrow = arrow(length=unit(.3, 'cm')), lwd=1)+
+  geom_segment(aes(x=70, y=9, xend=72, yend=7.5),  arrow = arrow(length=unit(.3, 'cm')), lwd=1)
+
+part_1
+```
+
+```{r,message= FALSE, warning=FALSE,fig.width=5, fig.height=4}
+# Using the lm function to make a linear model to look for causation of deaths
+lm(deaths_per_100k ~ fully_vaccinated_pct_of_pop, df)
+# Plotting the line
+part_2 <- part_1 + geom_smooth(method = lm, se=FALSE)
+part_2
+```
